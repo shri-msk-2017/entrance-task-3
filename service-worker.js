@@ -4,11 +4,15 @@
  * Сервис-воркер, обеспечивающий оффлайновую работу избранного
  */
 
-const CACHE_VERSION = '1.0.0-broken';
+const CACHE_VERSION = '1.0.0';
 
-importScripts('../vendor/kv-keeper.js-1.0.4/kv-keeper.js');
+importScripts('./vendor/kv-keeper.js-1.0.4/kv-keeper.js');
 
+// Событие install всегда посылается первым воркеру (это может быть использовано для запуска процесса заполнения IndexedDB и кеширования ресурсов)
+// preCacheAllFavorites - Положить в новый кеш все добавленные в избранное картинкип
 
+// По умолчанию, обновленный сервис-воркер не активируется, пока загружаются страницы, использующие старый сервис-воркер.
+// skipWaiting вызывает активацию обновленный ServiceWorker
 self.addEventListener('install', event => {
     const promise = preCacheAllFavorites()
         // Вопрос №1: зачем нужен этот вызов?
@@ -34,12 +38,13 @@ self.addEventListener('fetch', event => {
     const url = new URL(event.request.url);
 
     // Вопрос №3: для всех ли случаев подойдёт такое построение ключа?
+    // url.search ?
     const cacheKey = url.origin + url.pathname;
 
     let response;
     if (needStoreForOffline(cacheKey)) {
         response = caches.match(cacheKey)
-            .then(cacheResponse => cacheResponse || fetchAndPutToCache(cacheKey, event.request));
+            .then(cacheResponse => fetchWithFallbackToCache(event.request) || fetchAndPutToCache(cacheKey, event.request));
     } else {
         response = fetchWithFallbackToCache(event.request);
     }
@@ -127,6 +132,7 @@ function deleteObsoleteCaches() {
 function needStoreForOffline(cacheKey) {
     return cacheKey.includes('vendor/') ||
         cacheKey.includes('assets/') ||
+        cacheKey.endsWith('gifs.html') ||
         cacheKey.endsWith('jquery.min.js');
 }
 
