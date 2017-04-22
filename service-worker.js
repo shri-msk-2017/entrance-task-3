@@ -4,7 +4,20 @@
  * Сервис-воркер, обеспечивающий оффлайновую работу избранного
  */
 
-const CACHE_VERSION = '1.0.0';
+const CACHE_VERSION = '1.0.0',
+      URLS_TO_CACHE = [
+            'https://yastatic.net/jquery/3.1.0/jquery.min.js',
+            './assets/star.svg',
+            './assets/blocks.js',
+            './assets/style.css',
+            './assets/templates.js',
+            './vendor/bem-components-dist-5.0.0/touch-phone/bem-components.dev.css',
+            './vendor/bem-components-dist-5.0.0/touch-phone/bem-components.dev.js',
+            './vendor/kv-keeper.js-1.0.4/kv-keeper.js',
+            './gifs.html'
+      ];
+
+let cachesURL = [];
 
 importScripts('./vendor/kv-keeper.js-1.0.4/kv-keeper.js');
 
@@ -14,13 +27,23 @@ importScripts('./vendor/kv-keeper.js-1.0.4/kv-keeper.js');
 // По умолчанию, обновленный сервис-воркер не активируется, пока загружаются страницы, использующие старый сервис-воркер.
 // skipWaiting вызывает активацию обновленный ServiceWorker
 self.addEventListener('install', event => {
-    const promise = preCacheAllFavorites()
+    const promise = assetsToCache()
+        .then(() => preCacheAllFavorites())
         // Вопрос №1: зачем нужен этот вызов?
         .then(() => self.skipWaiting())
         .then(() => console.log('[ServiceWorker] Installed!'));
 
     event.waitUntil(promise);
 });
+
+// кэшируем статику
+function assetsToCache() {
+    return caches.open(CACHE_VERSION)
+        .then(cache => {
+            console.log('Opened cache');
+            return cache.addAll(URLS_TO_CACHE);
+        })
+}
 
 self.addEventListener('activate', event => {
     const promise = deleteObsoleteCaches()
@@ -38,13 +61,12 @@ self.addEventListener('fetch', event => {
     const url = new URL(event.request.url);
 
     // Вопрос №3: для всех ли случаев подойдёт такое построение ключа?
-    // url.search ?
     const cacheKey = url.origin + url.pathname;
-
+    console.log(cacheKey)
     let response;
+
     if (needStoreForOffline(cacheKey)) {
-        response = caches.match(cacheKey)
-            .then(cacheResponse => fetchWithFallbackToCache(event.request) || fetchAndPutToCache(cacheKey, event.request));
+        response = fetchAndPutToCache(cacheKey, event.request);
     } else {
         response = fetchWithFallbackToCache(event.request);
     }
@@ -57,7 +79,6 @@ self.addEventListener('message', event => {
 
     event.waitUntil(promise);
 });
-
 
 // Положить в новый кеш все добавленные в избранное картинки
 function preCacheAllFavorites() {
@@ -138,6 +159,7 @@ function needStoreForOffline(cacheKey) {
 
 // Скачать и добавить в кеш
 function fetchAndPutToCache(cacheKey, request) {
+    console.log("put to cache")
     return fetch(request)
         .then(response => {
             return caches.open(CACHE_VERSION)
@@ -155,6 +177,7 @@ function fetchAndPutToCache(cacheKey, request) {
 
 // Попытаться скачать, при неудаче обратиться в кеш
 function fetchWithFallbackToCache(request) {
+    console.log("get from cache")
     return fetch(request)
         .catch(() => {
             console.log('[ServiceWorker] Fallback to offline cache:', request.url);
