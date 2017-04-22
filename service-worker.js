@@ -4,19 +4,39 @@
  * Сервис-воркер, обеспечивающий оффлайновую работу избранного
  */
 
-const CACHE_VERSION = '1.0.0-broken';
+const CACHE_VERSION = '1.0.0',
+      URLS_TO_CACHE = [
+            'https://yastatic.net/jquery/3.1.0/jquery.min.js',
+            './assets/star.svg',
+            './assets/blocks.js',
+            './assets/style.css',
+            './assets/templates.js',
+            './vendor/bem-components-dist-5.0.0/touch-phone/bem-components.dev.css',
+            './vendor/bem-components-dist-5.0.0/touch-phone/bem-components.dev.js',
+            './vendor/kv-keeper.js-1.0.4/kv-keeper.js',
+            './gifs.html'
+      ];
 
-importScripts('../vendor/kv-keeper.js-1.0.4/kv-keeper.js');
-
+importScripts('./vendor/kv-keeper.js-1.0.4/kv-keeper.js');
 
 self.addEventListener('install', event => {
-    const promise = preCacheAllFavorites()
+    const promise = assetsToCache()
+        .then(() => preCacheAllFavorites())
         // Вопрос №1: зачем нужен этот вызов?
         .then(() => self.skipWaiting())
         .then(() => console.log('[ServiceWorker] Installed!'));
 
     event.waitUntil(promise);
 });
+
+// кэшируем статику
+function assetsToCache() {
+    return caches.open(CACHE_VERSION)
+        .then(cache => {
+            console.log('Opened cache');
+            return cache.addAll(URLS_TO_CACHE);
+        })
+}
 
 self.addEventListener('activate', event => {
     const promise = deleteObsoleteCaches()
@@ -35,11 +55,10 @@ self.addEventListener('fetch', event => {
 
     // Вопрос №3: для всех ли случаев подойдёт такое построение ключа?
     const cacheKey = url.origin + url.pathname;
-
     let response;
+
     if (needStoreForOffline(cacheKey)) {
-        response = caches.match(cacheKey)
-            .then(cacheResponse => cacheResponse || fetchAndPutToCache(cacheKey, event.request));
+        response = fetchAndPutToCache(cacheKey, event.request);
     } else {
         response = fetchWithFallbackToCache(event.request);
     }
@@ -52,7 +71,6 @@ self.addEventListener('message', event => {
 
     event.waitUntil(promise);
 });
-
 
 // Положить в новый кеш все добавленные в избранное картинки
 function preCacheAllFavorites() {
@@ -127,6 +145,7 @@ function deleteObsoleteCaches() {
 function needStoreForOffline(cacheKey) {
     return cacheKey.includes('vendor/') ||
         cacheKey.includes('assets/') ||
+        cacheKey.endsWith('gifs.html') ||
         cacheKey.endsWith('jquery.min.js');
 }
 
