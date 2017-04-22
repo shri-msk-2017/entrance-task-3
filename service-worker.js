@@ -17,15 +17,8 @@ const CACHE_VERSION = '1.0.0',
             './gifs.html'
       ];
 
-let cachesURL = [];
-
 importScripts('./vendor/kv-keeper.js-1.0.4/kv-keeper.js');
 
-// Событие install всегда посылается первым воркеру (это может быть использовано для запуска процесса заполнения IndexedDB и кеширования ресурсов)
-// preCacheAllFavorites - Положить в новый кеш все добавленные в избранное картинкип
-
-// По умолчанию, обновленный сервис-воркер не активируется, пока загружаются страницы, использующие старый сервис-воркер.
-// skipWaiting вызывает активацию обновленный ServiceWorker
 self.addEventListener('install', event => {
     const promise = assetsToCache()
         .then(() => preCacheAllFavorites())
@@ -62,7 +55,6 @@ self.addEventListener('fetch', event => {
 
     // Вопрос №3: для всех ли случаев подойдёт такое построение ключа?
     const cacheKey = url.origin + url.pathname;
-    console.log(cacheKey)
     let response;
 
     if (needStoreForOffline(cacheKey)) {
@@ -159,7 +151,6 @@ function needStoreForOffline(cacheKey) {
 
 // Скачать и добавить в кеш
 function fetchAndPutToCache(cacheKey, request) {
-    console.log("put to cache")
     return fetch(request)
         .then(response => {
             return caches.open(CACHE_VERSION)
@@ -177,7 +168,6 @@ function fetchAndPutToCache(cacheKey, request) {
 
 // Попытаться скачать, при неудаче обратиться в кеш
 function fetchWithFallbackToCache(request) {
-    console.log("get from cache")
     return fetch(request)
         .catch(() => {
             console.log('[ServiceWorker] Fallback to offline cache:', request.url);
